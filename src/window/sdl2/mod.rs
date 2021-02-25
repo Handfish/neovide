@@ -47,6 +47,7 @@ pub struct Sdl2WindowWrapper {
     grid_id_under_mouse: u64,
     title: String,
     previous_size: LogicalSize,
+    previous_scale: f64,
     transparency: f32,
     fullscreen: bool,
     cached_size: (u32, u32),
@@ -352,9 +353,12 @@ impl Sdl2WindowWrapper {
     fn draw_frame(&mut self, dt: f32) -> VkResult<bool> {
         let sdl_window_wrapper = Sdl2Window::new(&self.window);
         let new_size = sdl_window_wrapper.logical_size();
-        if self.previous_size != new_size {
+        let new_scale = sdl_window_wrapper.scale_factor();
+
+        if self.previous_size != new_size || self.previous_scale != new_scale {
             handle_new_grid_size(new_size, &self.renderer, &self.ui_command_sender);
             self.previous_size = new_size;
+            self.previous_scale = new_scale;
         }
 
         let current_size = self.previous_size;
@@ -362,13 +366,11 @@ impl Sdl2WindowWrapper {
 
         if REDRAW_SCHEDULER.should_draw() || SETTINGS.get::<WindowSettings>().no_idle {
             log::debug!("Render Triggered");
-
-            let scaling = sdl_window_wrapper.scale_factor();
             let renderer = &mut self.renderer;
             self.skulpin_renderer.draw(
                 &sdl_window_wrapper,
                 |canvas, coordinate_system_helper| {
-                    if renderer.draw_frame(canvas, &coordinate_system_helper, dt, scaling as f32) {
+                    if renderer.draw_frame(canvas, &coordinate_system_helper, dt, new_scale as f32) {
                         handle_new_grid_size(current_size, &renderer, &ui_command_sender);
                     }
                 },
@@ -478,6 +480,7 @@ pub fn start_loop(
         grid_id_under_mouse: 0,
         title: String::from("Neovide"),
         previous_size: logical_size,
+        previous_scale: 1.0,
         transparency: 1.0,
         fullscreen: false,
         cached_size: (0, 0),
